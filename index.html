@@ -17,6 +17,1586 @@
     
     <script type="text/babel">
         // 여기에 기존 React 코드를 그대로 붙여넣기
+        const { useState, useEffect, useRef } = React;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDZh8BLh90EM3G5hNjd2FwkGywPuEIY2xw",
+  authDomain: "creativesisul-89eb9.firebaseapp.com",
+  databaseURL: "https://creativesisul-89eb9-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "creativesisul-89eb9",
+  storageBucket: "creativesisul-89eb9.firebasestorage.app",
+  messagingSenderId: "666983893271",
+  appId: "1:666983893271:web:4547127ac65cd29e75cf52"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+const CreativeToppingContest = () => {
+  const [currentPage, setCurrentPage] = useState('welcome');
+  const [currentQuiz, setCurrentQuiz] = useState(0);
+  const [quizStartTime, setQuizStartTime] = useState(null);
+  const [quizEndTime, setQuizEndTime] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [userInfo, setUserInfo] = useState({ name: '', employeeId: '', department: '' });
+  const [ideaText, setIdeaText] = useState('');
+  const [ideaTitle, setIdeaTitle] = useState('');
+  const [aiEvaluation, setAiEvaluation] = useState(null);
+  const [gameCharacterPosition, setGameCharacterPosition] = useState({ x: 50, y: 400 });
+  const [gameStarted, setGameStarted] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [gameTime, setGameTime] = useState(0);
+  const canvasRef = useRef(null);
+  const [participants, setParticipants] = useState([
+    { name: '김창영', employeeId: '2024001', department: '기획조정실', score: 95, quizScore: 90, ideaScore: 98, completedAt: new Date(Date.now() - 1000 * 60 * 15), quizCorrectCount: 10, quizTime: 30, ideaTitle: '시민 체육시설 예약 간소화 방안', idea: '현재 체육시설 예약 시 복잡한 절차와 많은 서류 제출로 시민들이 불편을 겪고 있습니다. 온라인 원클릭 예약 시스템 도입을 통해 간단한 본인인증만으로 예약이 가능하도록 개선하고, 모바일 앱을 통한 실시간 예약 현황 확인 및 취소 기능을 제공한다면 시민 편의성이 크게 향상될 것입니다. 또한 AI 기반 추천 시스템으로 이용자 패턴을 분석하여 최적의 시설과 시간을 추천해주는 서비스도 함께 제공할 수 있습니다.' }
+  ]);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+// Firebase 실시간 데이터 읽기
+useEffect(() => {
+  const participantsRef = database.ref('participants');
+participantsRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      const participantsList = Object.keys(data).map(key => ({
+        id: key,
+        ...data[key]
+      })).sort((a, b) => b.score - a.score);
+      setParticipants(participantsList);
+    }
+  });
+}, []);
+
+// 새 참가자 저장 함수
+const saveParticipant = (newParticipant) => {
+  const participantsRef = ref(database, 'participants');
+  participantsRef.push(newParticipant);
+};
+
+// 부서 목록
+const departments = [
+  '감사실', '기획조정실', '인사노무처', '총무처', '홍보실',
+  '인재문화원', 'IT전략실', '상가운영처', '추모시설운영처', '장애인콜택시운영처',
+  '서울월드컵경기장운영처', '돔경기장운영처', '서울어린이대공원', '청계천관리처', '남산곤돌라인수단TF',
+  '자산관리혁신처', '도로관리처', '도로시설처', '도로기전처', '도로환경처',
+  '교통정보처', '공사감독1처', '공사감독2처', '공사감독3처', '공동구관리처',
+  '상수도지원처', '주차시설운영처', '교통시설운영처', '공공자전거운영처', '안전처'
+];
+
+  // 게임 장애물 정의
+  const obstacles = [
+    { x: 150, y: 380, width: 40, height: 40, cleared: false, type: '🚧' },
+    { x: 250, y: 350, width: 40, height: 70, cleared: false, type: '🗻' },
+    { x: 350, y: 320, width: 40, height: 100, cleared: false, type: '🌊' },
+    { x: 450, y: 360, width: 40, height: 60, cleared: false, type: '🔥' },
+    { x: 550, y: 340, width: 40, height: 80, cleared: false, type: '⚡' },
+    { x: 650, y: 370, width: 40, height: 50, cleared: false, type: '🌪️' },
+    { x: 750, y: 330, width: 40, height: 90, cleared: false, type: '🎯' },
+    { x: 850, y: 350, width: 40, height: 70, cleared: false, type: '💎' },
+    { x: 950, y: 360, width: 40, height: 60, cleared: false, type: '🏔️' },
+    { x: 1050, y: 340, width: 40, height: 80, cleared: false, type: '🏆' }
+  ];
+
+  // 퀴즈 데이터
+  const quizzes = [
+    {
+      question: "2025년 1월 1일 서울시장 신년사에서 선포한 주요 정책은 무엇인가?",
+      options: ["규제완화와 성장촉진", "규제와의 전쟁", "행정절차 간소화", "스마트시티 추진"],
+      correct: 2,
+      obstacle: "🚧",
+      terrain: "규제철폐 시작지점",
+      explanation: "시장 신년사에서 '규제와의 전쟁'을 선포하고 규제철폐를 강조하였다."
+    },
+    {
+      question: "공단의 창의제안 플랫폼의 명칭은 무엇인가?",
+      options: ["이메일", "I:ON", "모바일 메신저", "공문 발송"],
+      correct: 2,
+      obstacle: "🗻",
+      terrain: "과제발굴 산맥",
+      explanation: "공단 창의제안 플랫폼의 명칭은 'I:ON'입니다. (접속방법 : ETIS – I:ON – 지식등록)"
+    },
+    {
+      question: "따릉이 '가족권' 제도 시행으로 부모 동반 시 이용이 가능해진 연령대는?",
+      options: ["10세 미만", "11세 미만", "12세 미만", "13세 미만"],
+      correct: 4,
+      obstacle: "🌊",
+      terrain: "업무개선 강을 건너는 중",
+      explanation: "기존에는 13세 미만 이용이 제한됐으나, 가족권 도입으로 부모 동반 시 13세 미만도 이용 가능해졌다."
+    },
+    {
+      question: "정신적 장애인의 장애인콜택시 단독탑승과 관련된 2025년 2월 개선 내용은?",
+      options: ["단독탑승 금지", "사전 신청제도 신설", "사전 신청 절차 폐지", "동승자 제한 강화"],
+      correct: 3,
+      obstacle: "🔥",
+      terrain: "법령개정 용암지대",
+      explanation: "2025년 2월부터는 자격 충족 시 사전 신청 절차 없이 단독탑승이 가능하도록 규제를 개선했다."
+    },
+    {
+      question: "서울글로벌센터 국제회의장 신청 절차 개선 내용으로 옳은 것은?",
+      options: ["신청서 표준화 및 공공서비스 예약사이트 연계", "현장 방문 신청만 허용", "신청 절차에 심사위원회 추가", "신청서 양식 자율화 유지"],
+      correct: 1,
+      obstacle: "⚡",
+      terrain: "기관협력 번개구름",
+      explanation: "신청서를 표준화하고 공공서비스 예약사이트와 연계하여 승인 절차를 간소화했다."
+    },
+    {
+      question: "서울월드컵경기장 부속시설 예약·정산 절차 개선의 핵심 변화는?",
+      options: ["일일 정산 체계 도입", "예약 시기 통합 및 월 단위 정산 체계로 변경", "현장 예약만 허용", "환불 불가 규정 강화"],
+      correct: 2,
+      obstacle: "🌪️",
+      terrain: "조직운영 토네이도",
+      explanation: "예약 시기를 통합하고 월 단위 정산 체계로 바꾸어 시민 편의와 환불 절차를 개선했다."
+    },
+    {
+      question: "영세시공사 안전관리 지원을 위해 공단이 제작한 자료는?",
+      options: ["현장안전법령집", "안전관리대책 작성 가이드북", "시공사 홍보책자", "설계도면 표준집"],
+      correct: 2,
+      obstacle: "🎯",
+      terrain: "창의아이디어 표적지역",
+      explanation: "영세 시공사를 위해 안전보건경영시스템 인증 기준, 안전관리대책 작성 방법 등이 수록된 안전관리대책 작성 가이드북을 제작하여 배포하였다."
+    },
+    {
+      question: "교통데이터 '원클릭' 바로확인 서비스의 개선 후 제공 방식으로 옳은 것은?",
+      options: ["공문 접수 후 1~3주 내 제공", "데이터 조회 즉시 표·그래프 등으로 제공", "전화 문의만 허용", "일부 노선에 한해 반기 제공"],
+      correct: 2,
+      obstacle: "💎",
+      terrain: "시민체감 크리스탈동굴",
+      explanation: "별도 절차 없이 원하는 데이터를 즉시 조회·시각화해 제공하는 수요자 중심 체계다."
+    },
+    {
+      question: "공사와 관련된 법령, 내부규정, 방침, 공사 단계별 이행사항 등의 정보를 신속하게 제공하기 위한 「아리수 챗봇」의 플랫폼으로 옳은 것은?",
+      options: ["자체 메신저", "카카오채널 기반 챗봇", "SMS 자동응답", "이메일 상담"],
+      correct: 2,
+      obstacle: "🏔️",
+      terrain: "정책협력 빙하지역",
+      explanation: "카카오채널 기반으로 Rule-Based 방식의 키워드 자동응답을 제공하도록 설계되었다."
+    },
+    {
+      question: "공단 규제철폐 과제의 성공 기준은?",
+      options: ["내부 관계자의 만족", "시민들이 느끼는 현장의 체감도", "공사 건수 확대", "세수 확보"],
+      correct: 2,
+      obstacle: "🏆",
+      terrain: "시민서비스 골인지점",
+      explanation: "단순한 제도 개선을 넘어 시민 생활 속 실질적인 불편을 제거하여 현장 체감도를 높이는 것이 성공의 기준이다."
+    }
+  ];
+
+  // 게임 타이머 효과
+  useEffect(() => {
+    let interval = null;
+    if (gameStarted && currentPage === 'quiz') {
+      interval = setInterval(() => {
+        setGameTime(prevTime => prevTime + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [gameStarted, currentPage]);
+
+  // 캔버스 그리기 효과
+  useEffect(() => {
+    if (currentPage === 'quiz') {
+      drawGame();
+    }
+  }, [currentPage, gameCharacterPosition, currentQuiz]);
+
+  // 캔버스 게임 그리기 함수
+  const drawGame = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // 캔버스 초기화
+    ctx.clearRect(0, 0, width, height);
+
+    // 배경 그라디언트
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, '#e0f2fe');
+    gradient.addColorStop(0.5, '#f0f9ff');
+    gradient.addColorStop(1, '#fef3c7');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // 지면 그리기
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(0, height - 50, width, 50);
+
+    // 시작점
+    ctx.fillStyle = '#10b981';
+    ctx.fillRect(0, height - 100, 50, 50);
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('START', 25, height - 70);
+
+    // 골인점
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(width - 50, height - 100, 50, 50);
+    ctx.fillStyle = 'white';
+    ctx.fillText('GOAL', width - 25, height - 70);
+
+    // 장애물들 그리기
+    obstacles.forEach((obstacle, index) => {
+      if (index < currentQuiz) {
+        // 통과한 장애물
+        ctx.fillStyle = '#86efac';
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.fillStyle = '#16a34a';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('✓', obstacle.x + 20, obstacle.y + 25);
+      } else if (index === currentQuiz) {
+        // 현재 장애물 (깜빡임 효과)
+        const opacity = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(239, 68, 68, ${opacity})`;
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('?', obstacle.x + 20, obstacle.y + 28);
+      } else {
+        // 아직 도달하지 않은 장애물
+        ctx.fillStyle = '#9ca3af';
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText((index + 1).toString(), obstacle.x + 20, obstacle.y + 25);
+      }
+    });
+
+    // 누비 캐릭터 그리기
+    const nubiX = gameCharacterPosition.x;
+    const nubiY = gameCharacterPosition.y;
+
+    // 누비 몸체 (파란색)
+    ctx.fillStyle = '#4A90E2';
+    ctx.beginPath();
+    ctx.arc(nubiX, nubiY - 15, 25, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 누비 얼굴 (흰색)
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(nubiX, nubiY - 15, 20, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 누비 모자 (파란색)
+    ctx.fillStyle = '#4A90E2';
+    ctx.beginPath();
+    ctx.arc(nubiX, nubiY - 30, 18, Math.PI, 2 * Math.PI);
+    ctx.fill();
+
+    // 모자 끝부분 (곡선)
+    ctx.fillStyle = '#4A90E2';
+    ctx.beginPath();
+    ctx.ellipse(nubiX + 15, nubiY - 35, 8, 4, -0.3, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 모자 줄무늬 (초록색)
+    ctx.fillStyle = '#7ED321';
+    ctx.fillRect(nubiX - 18, nubiY - 25, 36, 4);
+
+    // 누비 눈 (검은색)
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(nubiX - 8, nubiY - 18, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(nubiX + 8, nubiY - 18, 3, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 누비 입 (분홍색, 웃는 모양)
+    ctx.fillStyle = '#FF6B9D';
+    ctx.beginPath();
+    ctx.ellipse(nubiX, nubiY - 8, 6, 4, 0, 0, Math.PI);
+    ctx.fill();
+
+    // 누비 볼 (연한 파란색)
+    ctx.fillStyle = 'rgba(173, 216, 230, 0.7)';
+    ctx.beginPath();
+    ctx.arc(nubiX - 15, nubiY - 10, 5, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(nubiX + 15, nubiY - 10, 5, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 누비 몸통 (초록색 조끼)
+    ctx.fillStyle = '#7ED321';
+    ctx.fillRect(nubiX - 12, nubiY + 5, 24, 15);
+
+    // 누비 팔 (파란색)
+    ctx.fillStyle = '#4A90E2';
+    ctx.beginPath();
+    ctx.arc(nubiX - 20, nubiY + 8, 8, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(nubiX + 20, nubiY + 8, 8, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 누비 다리 (파란색)
+    ctx.fillStyle = '#4A90E2';
+    ctx.fillRect(nubiX - 8, nubiY + 18, 6, 12);
+    ctx.fillRect(nubiX + 2, nubiY + 18, 6, 12);
+
+    // 움직임 효과 (속도선)
+    if (gameCharacterPosition.x > 25) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(nubiX - 30 - (i * 5), nubiY - 10 + (i * 3));
+        ctx.lineTo(nubiX - 40 - (i * 5), nubiY - 10 + (i * 3));
+        ctx.stroke();
+      }
+    }
+
+    // 진행률 바
+    const progress = (currentQuiz / quizzes.length) * 100;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(10, 10, width - 20, 30);
+    ctx.fillStyle = '#10b981';
+    ctx.fillRect(10, 10, (width - 20) * (progress / 100), 30);
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`누비의 모험 진행률: ${Math.round(progress)}% (${currentQuiz}/${quizzes.length})`, width / 2, 30);
+
+    // 타이머 표시
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'right';
+    const minutes = Math.floor(gameTime / 60);
+    const seconds = gameTime % 60;
+    ctx.fillText(`${minutes}:${seconds.toString().padStart(2, '0')}`, width - 20, 70);
+  };
+
+  // 캐릭터 이동 처리
+  const handlePlayerMove = () => {
+    if (currentQuiz >= quizzes.length) {
+      // 모든 퀴즈 완료 시 골인점으로 이동
+      if (canvasRef.current) {
+        const goalX = canvasRef.current.width - 25;
+        if (gameCharacterPosition.x < goalX) {
+          setGameCharacterPosition(prev => ({ x: prev.x + 5, y: prev.y }));
+        } else {
+          setTimeout(() => {
+            setCurrentPage('idea');
+            setQuizEndTime(Date.now());
+          }, 500);
+        }
+      }
+      return;
+    }
+
+    const targetObstacle = obstacles[currentQuiz];
+    if (gameCharacterPosition.x < targetObstacle.x - 20) {
+      // 장애물 방향으로 이동 (속도 증가)
+      setGameCharacterPosition(prev => ({ x: prev.x + 8, y: prev.y }));
+    } else if (!showQuizModal) {
+      // 장애물에 도달하면 퀴즈 모달 표시
+      setShowQuizModal(true);
+    }
+  };
+
+  // 퀴즈 답변 처리
+  const handleQuizAnswer = (answerIndex) => {
+    const isCorrect = answerIndex === quizzes[currentQuiz].correct;
+    
+    setAnswers(prev => ({ ...prev, [currentQuiz]: answerIndex }));
+
+    // 장애물 통과 후 위치 이동
+    setGameCharacterPosition(prev => ({ x: obstacles[currentQuiz].x + 60, y: prev.y }));
+    setShowQuizModal(false);
+    setCurrentQuiz(prev => prev + 1);
+  };
+
+  // 자동 이동 효과
+  useEffect(() => {
+    if (gameStarted && !showQuizModal && currentPage === 'quiz') {
+      const interval = setInterval(() => {
+        handlePlayerMove();
+      }, 50);
+      return () => clearInterval(interval);
+    }
+  }, [gameStarted, showQuizModal, currentPage, gameCharacterPosition.x, currentQuiz]);
+
+  // 게임 시작 함수
+  const startGame = () => {
+    setGameStarted(true);
+    setQuizStartTime(Date.now());
+    setCurrentPage('quiz');
+    setGameTime(0);
+    setCurrentQuiz(0);
+    setGameCharacterPosition({ x: 25, y: 370 });
+    setShowQuizModal(false);
+    setAnswers({});
+  };
+
+  const calculateQuizScore = (correctAnswers, totalTime) => {
+    const accuracy = (correctAnswers / quizzes.length) * 100;
+    const timeBonus = Math.max(0, 100 - totalTime / 60);
+    return Math.min(100, accuracy * 0.7 + timeBonus * 0.3);
+  };
+
+  const evaluateIdeaWithAI = (text) => {
+    // 친근하고 격려적인 AI 평가
+    const evaluation = {
+      score: 0,
+      feedback: "",
+      strengths: [],
+      improvements: [],
+      detailedAnalysis: ""
+    };
+
+    // 아이디어 유형 분석
+    const ideaTypes = {
+      시민서비스: ['시민', '민원', '예약', '신청', '이용자', '고객', '주민', '방문'],
+      내부업무: ['직원', '내부', '업무', 'ETIS', '결재', '휴가', '연차', '출장', '근무'],
+      시설관리: ['시설', '공원', '경기장', '주차장', '체육', '공간', '대관', '이용'],
+      디지털혁신: ['온라인', '모바일', '앱', 'QR', '디지털', '자동화', '시스템', 'IT'],
+      절차간소화: ['간소화', '간단', '단축', '축소', '통합', '일원화', '원스톱', '즉시'],
+      규정개선: ['규정', '규칙', '법령', '지침', '기준', '조례', '내규', '절차']
+    };
+
+    // 어떤 유형의 아이디어인지 파악
+    let mainType = '일반';
+    let typeScores = {};
+    
+    Object.entries(ideaTypes).forEach(([type, keywords]) => {
+      const score = keywords.filter(keyword => text.includes(keyword)).length;
+      if (score > 0) {
+        typeScores[type] = score;
+      }
+    });
+    
+    if (Object.keys(typeScores).length > 0) {
+      mainType = Object.keys(typeScores).reduce((a, b) => typeScores[a] > typeScores[b] ? a : b);
+    }
+
+    // 기본 점수 설정 (70점에서 시작)
+    let baseScore = 70;
+
+    // 1. 글자 수 보너스 (최대 10점)
+    const length = text.length;
+    let lengthBonus = 0;
+    
+    if (length >= 100) {
+      lengthBonus = Math.min(10, Math.floor(length / 50));
+    }
+
+    // 2. 구조적 완성도 (최대 15점)
+    let structureBonus = 0;
+    const hasProblems = text.includes('문제') || text.includes('불편') || text.includes('어려') || text.includes('번거');
+    const hasSolutions = text.includes('개선') || text.includes('해결') || text.includes('방안') || text.includes('제안');
+    const hasEffects = text.includes('효과') || text.includes('향상') || text.includes('절감') || text.includes('단축');
+    
+    if (hasProblems) structureBonus += 5;
+    if (hasSolutions) structureBonus += 5;
+    if (hasEffects) structureBonus += 5;
+
+    // 3. 구체성 보너스 (최대 5점)
+    let specificityBonus = 0;
+    const hasNumbers = /\d/.test(text);
+    const hasSpecificExamples = text.includes('예를') || text.includes('경우') || text.includes('현재');
+    
+    if (hasNumbers) specificityBonus += 3;
+    if (hasSpecificExamples) specificityBonus += 2;
+
+    // 최종 점수 계산
+    const finalScore = Math.min(100, baseScore + lengthBonus + structureBonus + specificityBonus);
+    evaluation.score = Math.round(finalScore);
+
+    // 유형별 맞춤형 강점 분석
+    const typeStrengths = {
+      시민서비스: [
+        "시민 편의를 최우선으로 생각하신 점이 훌륭해요! 🏆",
+        "시민 입장에서의 불편함을 잘 파악하셨네요! 👏",
+        "공공서비스 개선에 대한 좋은 아이디어입니다! 🎯"
+      ],
+      내부업무: [
+        "직원들의 업무 효율성을 높이는 실용적인 제안이네요! 💼",
+        "내부 업무프로세스 개선에 대한 통찰력이 돋보입니다! 🔍",
+        "직원 만족도 향상에 기여할 수 있는 아이디어예요! 😊"
+      ],
+      시설관리: [
+        "시설 운영 효율화를 위한 현실적인 방안이네요! 🏢",
+        "시설 이용자 관점에서의 개선점을 잘 찾으셨어요! 🎪",
+        "공간 활용도를 높이는 창의적인 아이디어입니다! 🌟"
+      ],
+      디지털혁신: [
+        "디지털 전환 시대에 맞는 혁신적인 아이디어예요! 💻",
+        "기술을 활용한 업무 혁신 방안이 인상적입니다! 🚀",
+        "스마트한 해결책을 제시해주셨네요! 📱"
+      ],
+      절차간소화: [
+        "복잡한 절차를 단순화하는 핵심을 잘 짚으셨어요! ⚡",
+        "업무 프로세스 개선의 좋은 사례가 될 것 같아요! 🔄",
+        "시간과 비용을 절감할 수 있는 효율적인 방안이네요! ⏱️"
+      ],
+      규정개선: [
+        "불합리한 규정을 개선하려는 의지가 돋보입니다! 📋",
+        "제도적 개선을 통한 근본적 해결 방안이네요! 🎯",
+        "규제 혁신의 좋은 출발점이 될 수 있을 것 같아요! 🚦"
+      ],
+      일반: [
+        "규제철폐를 위한 의미있는 제안 감사합니다! 👍",
+        "일상업무 개선에 대한 고민이 느껴지네요! 💭",
+        "작은 변화가 큰 혁신을 만들 수 있습니다! 🌱"
+      ]
+    };
+
+    // 유형별 강점 선택 (랜덤하게 1-2개)
+    const availableStrengths = typeStrengths[mainType] || typeStrengths['일반'];
+    const selectedStrengths = availableStrengths.sort(() => 0.5 - Math.random()).slice(0, 2);
+    evaluation.strengths.push(...selectedStrengths);
+
+    // 구조적 강점 추가
+    if (hasProblems && hasSolutions && hasEffects) {
+      evaluation.strengths.push("문제-해결방안-기대효과를 체계적으로 정리하셨네요! 📊");
+    }
+    if (length >= 300) {
+      evaluation.strengths.push("상세하고 구체적인 설명이 인상적입니다! 📝");
+    }
+
+    // 개선 제안 (유형별 맞춤형)
+    const typeImprovements = {
+      시민서비스: [
+        "예상 이용자 수나 만족도 향상 정도를 추가하면 더 좋겠어요 📈",
+        "타 기관 우수사례를 참고하면 더 완성도가 높아질 거예요 🔍"
+      ],
+      내부업무: [
+        "업무 시간 단축 효과를 수치로 제시하면 더 설득력 있을 거예요 ⏰",
+        "다른 부서와의 협업 방안도 고려해보세요 🤝"
+      ],
+      시설관리: [
+        "시설 이용률 향상 정도를 예측해보면 좋겠어요 📊",
+        "유지보수 비용 절감 효과도 함께 고려해보세요 💰"
+      ],
+      디지털혁신: [
+        "시스템 구축 비용과 기대 효과를 비교하면 좋겠어요 💵",
+        "사용자 교육 방안도 함께 제시하면 완벽할 거예요 📚"
+      ],
+      절차간소화: [
+        "단계별 소요시간 단축 효과를 명시하면 더 좋겠어요 ⏱️",
+        "예외 상황 처리 방안도 고민해보세요 🔄"
+      ],
+      규정개선: [
+        "법적 검토사항이 있다면 함께 언급해주세요 ⚖️",
+        "단계적 시행 방안을 제시하면 현실성이 높아져요 📅"
+      ],
+      일반: [
+        "구체적인 실행 계획을 추가하면 더 좋겠어요 📝",
+        "예상되는 어려움과 해결방안도 고려해보세요 💡"
+      ]
+    };
+
+    // 개선사항 선택 (점수에 따라 다르게)
+    if (evaluation.score < 80) {
+      const improvements = typeImprovements[mainType] || typeImprovements['일반'];
+      evaluation.improvements.push(improvements[Math.floor(Math.random() * improvements.length)]);
+    }
+    
+    if (!hasEffects) {
+      evaluation.improvements.push("기대효과를 좀 더 구체적으로 작성해주시면 좋겠어요 🎯");
+    }
+
+    // 상세 분석 (유형별 맞춤형)
+    const typeMessages = {
+      시민서비스: "시민 중심의 서비스 개선",
+      내부업무: "직원 업무효율 향상",
+      시설관리: "시설운영 효율화",
+      디지털혁신: "디지털 전환 가속화",
+      절차간소화: "업무 프로세스 최적화",
+      규정개선: "제도적 혁신",
+      일반: "일상업무 개선"
+    };
+
+    evaluation.detailedAnalysis = `
+🎉 창의토핑 경진대회 AI 평가 결과
+
+📌 【아이디어 유형】
+${typeMessages[mainType]} 관련 아이디어로 분류되었습니다.
+
+📊 【점수 상세내역】
+• 기본 점수: 70점 (참여 점수)
+• 내용 충실도: +${lengthBonus}점 (${length}자 작성)
+• 구조적 완성도: +${structureBonus}점 ${hasProblems ? '(문제인식✓)' : ''} ${hasSolutions ? '(해결방안✓)' : ''} ${hasEffects ? '(기대효과✓)' : ''}
+• 구체성: +${specificityBonus}점 ${hasNumbers ? '(수치제시✓)' : ''} ${hasSpecificExamples ? '(사례제시✓)' : ''}
+
+💡 【종합 평가】
+${evaluation.score >= 95 ? `탁월한 아이디어입니다! ${mainType} 분야의 모범사례가 될 만한 제안이에요. 실무 적용 가능성이 매우 높습니다.` :
+  evaluation.score >= 90 ? `우수한 아이디어입니다! ${mainType} 개선에 실질적으로 기여할 수 있는 좋은 방안이네요.` :
+  evaluation.score >= 85 ? `좋은 아이디어입니다! ${mainType} 관련 업무 개선에 도움이 될 것 같아요.` :
+  evaluation.score >= 80 ? `의미있는 제안입니다! ${mainType} 분야의 발전 방향을 잘 제시하셨어요.` :
+  evaluation.score >= 75 ? `발전 가능성이 있는 아이디어입니다! 조금만 더 구체화하면 좋겠어요.` :
+  `좋은 시작입니다! ${mainType} 관련 경험을 더 자세히 나누어주시면 훨씬 좋은 아이디어가 될 거예요.`}
+
+🌈 【격려의 말씀】
+${mainType === '시민서비스' ? '시민의 목소리를 대변하는 여러분이 진정한 공공서비스 혁신가입니다!' :
+  mainType === '내부업무' ? '동료들의 업무 만족도를 생각하는 여러분의 마음이 조직을 변화시킵니다!' :
+  mainType === '시설관리' ? '현장의 목소리가 가장 중요합니다. 여러분의 경험이 큰 자산이에요!' :
+  mainType === '디지털혁신' ? '디지털 시대를 선도하는 여러분의 아이디어가 미래를 만듭니다!' :
+  mainType === '절차간소화' ? '복잡함을 단순하게 만드는 것이야말로 진정한 혁신입니다!' :
+  mainType === '규정개선' ? '불합리한 규정을 바꾸려는 용기가 조직을 발전시킵니다!' :
+  '작은 아이디어가 큰 변화를 만듭니다. 계속해서 좋은 제안 부탁드려요!'}
+    `.trim();
+
+    evaluation.feedback = `${evaluation.score}점! 🎉 ${evaluation.strengths[0]}`;
+
+    return evaluation;
+  };
+
+  const submitContest = () => {
+    if (!ideaTitle || ideaTitle.length > 50 || ideaText.length < 100 || ideaText.length > 500) {
+      alert('아이디어 제목(50자 이하)과 내용(100-500자)을 확인해주세요.');
+      return;
+    }
+    
+    // console.log 제거됨
+    const correctAnswers = Object.values(answers).filter((answer, index) => answer === quizzes[index].correct).length;
+    const totalTime = quizEndTime && quizStartTime ? Math.round((quizEndTime - quizStartTime) / 1000) : gameTime;
+    const quizScore = calculateQuizScore(correctAnswers, totalTime);
+    const ideaEvaluation = evaluateIdeaWithAI(ideaText);
+    const finalScore = Math.round(quizScore * 0.4 + ideaEvaluation.score * 0.6);
+    
+    setAiEvaluation(ideaEvaluation);
+    
+    const newParticipant = {
+      name: userInfo.name,
+      employeeId: userInfo.employeeId,
+      department: userInfo.department,
+      score: finalScore,
+      quizScore: Math.round(quizScore),
+      ideaScore: ideaEvaluation.score,
+      completedAt: new Date(),
+      ideaTitle: ideaTitle,
+      idea: ideaText,
+      quizAnswers: answers,
+      aiEvaluation: ideaEvaluation,
+      quizCorrectCount: correctAnswers,
+      quizTime: totalTime
+    };
+    
+    saveParticipant(newParticipant);
+    setCurrentPage('complete');
+  };
+
+  const renderWelcomePage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            💡
+            <h1 className="text-4xl font-bold text-gray-800">창의토핑 경진대회</h1>
+          </div>
+          <p className="text-xl text-gray-600">일상업무에 적용할 수 있는 규제철폐 아이디어</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            🎯
+            대회 안내
+          </h2>
+          <div className="space-y-4">
+            <div className="flex items-start">
+              ✅
+              <div>
+                <h3 className="font-semibold">1단계: 퀴즈 게임</h3>
+                <p className="text-gray-600 text-sm">서울시정방향 및 공단 사업계획 퀴즈 10문제</p>
+              </div>
+            </div>
+            <div className="flex items-start">
+              ✅
+              <div>
+                <h3 className="font-semibold">2단계: 아이디어 제출</h3>
+                <p className="text-gray-600 text-sm">규제철폐 아이디어 작성 (100-500자)</p>
+              </div>
+            </div>
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-semibold text-blue-800 mb-2">평가 기준</h4>
+              <div className="text-sm text-blue-700">
+                <p>• 퀴즈 게임: 40% (정답률 + 소요시간)</p>
+                <p>• 규제철폐 아이디어: 60% (AI 정밀평가)</p>
+                <p>• 아이디어 작성: 100-500자</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h3 className="text-xl font-semibold mb-4">참가자 정보 입력</h3>
+          <div className="space-y-4 mb-6">
+            <input
+              type="text"
+              placeholder="이름을 입력하세요"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={userInfo.name}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, name: e.target.value }))}
+            />
+            <input
+              type="text"
+              placeholder="사번을 입력하세요"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={userInfo.employeeId}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, employeeId: e.target.value }))}
+            />
+            <select
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={userInfo.department}
+              onChange={(e) => setUserInfo(prev => ({ ...prev, department: e.target.value }))}
+            >
+              <option value="">부서를 선택하세요</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              if (userInfo.name && userInfo.employeeId && userInfo.department) {
+                startGame();
+              } else {
+                alert('이름, 사번, 부서를 모두 입력해주세요.');
+              }
+            }}
+            disabled={!userInfo.name || !userInfo.employeeId || !userInfo.department}
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg flex items-center justify-center"
+          >
+            🎮 모험 시작하기
+            ➡️
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            🏆
+            실시간 순위
+          </h2>
+          <div className="space-y-3">
+            {participants.slice(0, 5).map((participant, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-3 ${
+                    index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-600' : 'bg-blue-500'
+                  }`}>
+                    {index + 1}
+                  </span>
+                  <div>
+                    <div className="font-semibold">{participant.name}</div>
+                    <div className="text-sm text-gray-500">{participant.department}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-lg">{participant.score}점</div>
+                  <div className="text-xs text-gray-500">
+                    퀴즈 게임 {participant.quizScore}점 (정답 {participant.quizCorrectCount || 0}개 + 소요시간 {Math.floor((participant.quizTime || 0) / 60)}:{((participant.quizTime || 0) % 60).toString().padStart(2, '0')}) + 아이디어 {participant.ideaScore}점
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            💡
+            함께 공유하는 규제철폐 아이디어
+          </h2>
+          <div className="space-y-4">
+            {participants
+              .filter(p => p.ideaTitle && p.idea)
+              .sort((a, b) => b.ideaScore - a.ideaScore)
+              .slice(0, 5)
+              .map((participant, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-bold mr-3 ${
+                        index === 0 ? 'bg-green-500' : index === 1 ? 'bg-blue-500' : index === 2 ? 'bg-purple-500' : 'bg-gray-500'
+                      }`}>
+                        {index + 1}
+                      </span>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{participant.ideaTitle}</h3>
+                        <div className="text-sm text-gray-500">{participant.name} ({participant.department})</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">{participant.ideaScore}점</div>
+                      <div className="text-xs text-gray-500">AI 평가</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                    {participant.idea.length > 150 ? `${participant.idea.substring(0, 150)}...` : participant.idea}
+                  </div>
+                  {participant.idea.length > 150 && (
+                    <button className="text-blue-500 text-xs mt-2 hover:underline">
+                      더보기
+                    </button>
+                  )}
+                </div>
+              ))}
+            {participants.filter(p => p.ideaTitle && p.idea).length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                💡
+                <p>아직 제출된 아이디어가 없습니다.</p>
+                <p className="text-sm">첫 번째 아이디어를 제출해보세요!</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-center">
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            className="text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
+          >
+            관리자 페이지
+          </button>
+        </div>
+
+        {/* 비밀번호 입력 모달 */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">관리자 인증</h3>
+              <p className="text-gray-600 mb-4">관리자 비밀번호를 입력하세요:</p>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+                placeholder="비밀번호 입력"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    if (passwordInput === 'sisulidea') {
+                      setCurrentPage('admin');
+                      setShowPasswordModal(false);
+                      setPasswordInput('');
+                    } else {
+                      alert('비밀번호가 틀렸습니다.');
+                      setPasswordInput('');
+                    }
+                  }
+                }}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (passwordInput === 'sisulidea') {
+                      setCurrentPage('admin');
+                      setShowPasswordModal(false);
+                      setPasswordInput('');
+                    } else {
+                      alert('비밀번호가 틀렸습니다.');
+                      setPasswordInput('');
+                    }
+                  }}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+                >
+                  확인
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordInput('');
+                  }}
+                  className="flex-1 bg-gray-400 text-white py-2 px-4 rounded-lg hover:bg-gray-500"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderQuizPage = () => {
+    const correctAnswers = Object.values(answers).filter((answer, index) => answer === quizzes[index].correct).length;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                🎯
+                누비의 규제철폐 모험기
+              </h2>
+              <div className="text-right">
+                <div className="text-sm text-gray-600">{userInfo.name} ({userInfo.department})</div>
+                <div className="text-lg font-bold text-blue-600">
+                  {currentQuiz >= quizzes.length ? `정답: ${correctAnswers}/${quizzes.length}` : `진행: ${currentQuiz}/${quizzes.length}`}
+                </div>
+              </div>
+            </div>
+
+            {/* 게임 캔버스 */}
+            <canvas
+              ref={canvasRef}
+              width={1200}
+              height={450}
+              className="w-full border-2 border-gray-300 rounded-lg bg-sky-50 shadow-inner"
+            />
+
+            {/* 게임 상태 표시 */}
+            <div className="mt-4 grid grid-cols-1 gap-4">
+              <div className="bg-blue-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {Math.floor(gameTime / 60)}:{(gameTime % 60).toString().padStart(2, '0')}
+                </div>
+                <div className="text-sm text-gray-600">소요 시간</div>
+              </div>
+            </div>
+
+            {currentQuiz < quizzes.length && (
+              <div className="mt-4 bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-center justify-center text-blue-800">
+                  <div className="text-4xl mr-4">{quizzes[currentQuiz].obstacle}</div>
+                  <div>
+                    <h3 className="font-bold text-lg">{quizzes[currentQuiz].terrain}</h3>
+                    <p className="text-sm">누비가 이동 중입니다... 장애물에 도달하면 퀴즈가 나타납니다!</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 게임 완료 모달 */}
+        {currentQuiz >= quizzes.length && currentPage === 'quiz' && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center transform scale-100 transition-all">
+              <div className="mb-6">
+                <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  ✅
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-2">🎉 누비의 모험 완료!</h3>
+                <p className="text-gray-600">누비가 모든 규제철폐 장애물을 통과했습니다!</p>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <div className="text-2xl font-bold text-blue-600 mb-2">{correctAnswers}/{quizzes.length}</div>
+                <div className="text-sm text-gray-600 mb-2">정답률</div>
+                <div className="text-lg font-bold text-purple-600">{Math.round(calculateQuizScore(correctAnswers, gameTime))}</div>
+                <div className="text-sm text-gray-600">퀴즈 점수</div>
+              </div>
+
+              <button
+                onClick={() => setCurrentPage('idea')}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center"
+              >
+                💡
+                아이디어 작성하러 가기
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 퀴즈 모달 */}
+        {showQuizModal && currentQuiz < quizzes.length && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full transform scale-100 transition-all">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <span className="text-4xl">{quizzes[currentQuiz].obstacle}</span>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-2">{quizzes[currentQuiz].terrain}</h3>
+                <p className="text-gray-600">누비를 도와 장애물을 돌파하세요!</p>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="text-xl font-semibold text-gray-800 mb-4 bg-gray-50 p-4 rounded-lg">
+                  {quizzes[currentQuiz].question}
+                </h4>
+                <div className="space-y-3">
+                  {quizzes[currentQuiz].options.map((option, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleQuizAnswer(index)}
+                      className="w-full p-4 text-left rounded-lg border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all transform hover:scale-105"
+                    >
+                      <div className="flex items-center">
+                        <span className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold mr-3">
+                          {index + 1}
+                        </span>
+                        <span className="font-medium">{option}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-center">
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <div className="flex items-center justify-center text-yellow-800">
+                    🏆
+                    <span className="text-sm">빠른 답변으로 시간 보너스를 받으세요!</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderIdeaPage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+            💡
+            규제철폐 아이디어 제출
+          </h2>
+          
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg mb-6">
+            <h3 className="font-semibold text-blue-800 mb-2">📋 작성 가이드</h3>
+            <p className="text-sm text-blue-700 mb-2">아래 작성방향을 참고하여 <strong>일상업무에 적용할 수 있는 규제철폐 아이디어</strong>를 작성해주세요!</p>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• <strong>현재 문제상황</strong> : 어떤 규제나 업무관행이 시민 혹은 내부직원들에게 불편을 주고 있는지</li>
+              <li>• <strong>개선방안</strong> : 문제상황을 개선하기 위해 어떤 규제철폐 방안이 있을지</li>
+              <li>• <strong>기대효과</strong> : 해당 규제철폐 시 어떤 긍정적 변화가 예상되는지</li>
+            </ul>
+            <div className="mt-3 p-3 bg-blue-100 rounded">
+              <p className="text-xs text-blue-800 font-semibold mb-1">[예시] 연차휴가 이월 시 별도 신청절차 폐지 및 자동이월</p>
+              <p className="text-xs text-blue-700">
+                - 한 해가 지나고 이월할 수 있는 연차가 남아있는 직원들의 경우에도, 실제로 연차를 이월하기 위해서는 ETIS를 통한 별도의 신청절차를 거쳐야함. 그러나 신청기간을 놓쳐 쓰지 못한 연차를 이월하지 못하고 소진해버리는 경우가 종종 발생함. 이런 문제를 해결하기 위해 연차 이월이 자동으로 될 수 있도록 절차와 시스템을 개선할 수 있으면 좋겠음.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                아이디어 제목
+              </label>
+              <span className={`text-sm ${
+                ideaTitle.length <= 50 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {ideaTitle.length}/50자
+              </span>
+            </div>
+            <input
+              type="text"
+              value={ideaTitle}
+              onChange={(e) => setIdeaTitle(e.target.value)}
+              placeholder="규제철폐 아이디어의 제목을 입력해주세요 (50자 이하)"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              maxLength={50}
+            />
+          </div>
+
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                아이디어 내용
+              </label>
+              <span className={`text-sm ${
+                ideaText.length >= 100 && ideaText.length <= 500 
+                  ? 'text-green-600' 
+                  : 'text-red-600'
+              }`}>
+                {ideaText.length}/500자
+              </span>
+            </div>
+            <textarea
+              value={ideaText}
+              onChange={(e) => setIdeaText(e.target.value)}
+              placeholder="일상업무에 적용할 수 있는 규제철폐 아이디어를 작성해주세요!
+- 현재 문제상황 : 어떤 규제나 업무관행이 시민 혹은 내부직원들에게 불편을 주고 있는지
+- 개선방안 : 문제상황을 개선하기 위해 어떤 규제철폐 방안이 있을지
+- 기대효과 : 규제철폐 시 어떤 긍정적 변화가 예상되는지"
+              className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center mb-2">
+              ⚡
+              <h4 className="font-semibold text-yellow-800">AI 평가 안내</h4>
+            </div>
+            <p className="text-sm text-yellow-700">
+              제출 후 서울시설공단 규제철폐 기본계획을 기준으로 AI가 상세한 평가와 피드백을 제공합니다.
+            </p>
+          </div>
+
+          <button
+            onClick={submitContest}
+            disabled={!ideaTitle || ideaTitle.length === 0 || ideaTitle.length > 50 || ideaText.length < 100 || ideaText.length > 500}
+            className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold text-lg"
+          >
+            최종 제출하기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCompletePage = () => {
+    const correctAnswers = Object.values(answers).filter((answer, index) => answer === quizzes[index].correct).length;
+    const totalTime = quizEndTime && quizStartTime ? Math.round((quizEndTime - quizStartTime) / 1000) : gameTime;
+    const quizScore = calculateQuizScore(correctAnswers, totalTime);
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="text-center mb-8">
+              🥇
+              <h1 className="text-3xl font-bold text-gray-800 mb-4">🎉 제출 완료!</h1>
+              <p className="text-lg text-gray-600 mb-6">
+                창의토핑 경진대회 참여해주셔서 감사합니다.
+              </p>
+            </div>
+
+            {/* 퀴즈 결과 */}
+            <div className="bg-blue-50 rounded-lg p-6 mb-6">
+              <h3 className="font-semibold text-blue-800 mb-4 flex items-center">
+                🏆
+                퀴즈 게임 결과 (40%)
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4 text-sm mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{correctAnswers}/10</div>
+                  <div className="text-gray-600">정답 개수</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{Math.abs(totalTime)}초</div>
+                  <div className="text-gray-600">소요 시간</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{Math.round(quizScore)}점</div>
+                  <div className="text-gray-600">퀴즈 점수</div>
+                </div>
+              </div>
+
+              {/* 문제별 정답 및 해설 */}
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-blue-800 mb-3">📝 문제별 정답 및 해설</h4>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {quizzes.map((quiz, index) => {
+                    const userAnswer = answers[index];
+                    const isCorrect = userAnswer === quiz.correct;
+                    return (
+                      <div key={index} className="bg-white p-3 rounded border">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-800 mb-1">
+                              Q{index + 1}. {quiz.question}
+                            </div>
+                            <div className="flex items-center">
+                              <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium mr-2 ${
+                                isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {isCorrect ? '✓ 정답' : '✗ 오답'}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                정답: {quiz.options[quiz.correct]}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                          💡 {quiz.explanation}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* AI 평가 결과 */}
+            {aiEvaluation && (
+              <div className="bg-green-50 rounded-lg p-6 mb-6">
+                <h3 className="font-semibold text-green-800 mb-4 flex items-center">
+                  💡
+                  AI 아이디어 평가 결과 (60%)
+                </h3>
+                
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold">종합 점수</span>
+                    <span className="text-2xl font-bold text-green-600">{aiEvaluation.score}점</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-4">{aiEvaluation.feedback}</div>
+                </div>
+
+                {aiEvaluation.strengths.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-green-700 mb-2">💪 강점</h4>
+                    <ul className="text-sm text-green-600 space-y-1">
+                      {aiEvaluation.strengths.map((strength, index) => (
+                        <li key={index}>• {strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {aiEvaluation.improvements.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-orange-700 mb-2">🔧 개선 제안</h4>
+                    <ul className="text-sm text-orange-600 space-y-1">
+                      {aiEvaluation.improvements.map((improvement, index) => (
+                        <li key={index}>• {improvement}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-gray-800 mb-2">📊 상세 분석</h4>
+                  <div className="text-sm text-gray-700 whitespace-pre-line bg-white p-4 rounded border">
+                    {aiEvaluation.detailedAnalysis}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 최종 점수 */}
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <h3 className="font-semibold text-gray-800 mb-4">최종 결과</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>퀴즈 점수 (40%)</span>
+                  <span className="font-semibold">{Math.round(quizScore)}점</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>아이디어 점수 (60%)</span>
+                  <span className="font-semibold">{aiEvaluation?.score || 0}점</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between font-bold text-lg">
+                  <span>최종 점수</span>
+                  <span className="text-blue-600">
+                    {Math.round(quizScore * 0.4 + (aiEvaluation?.score || 0) * 0.6)}점
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  setCurrentPage('welcome');
+                  setCurrentQuiz(0);
+                  setAnswers({});
+                  setIdeaText('');
+                  setIdeaTitle('');
+                  setAiEvaluation(null);
+                  setUserInfo({ name: '', employeeId: '', department: '' });
+                  setGameStarted(false);
+                  setShowQuizModal(false);
+                  setGameTime(0);
+                  setGameCharacterPosition({ x: 50, y: 400 });
+                }}
+                className="bg-blue-600 text-white py-3 px-8 rounded-lg hover:bg-blue-700 font-semibold"
+              >
+                🏠 처음으로 돌아가기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 개별 참가자 삭제 함수 - 인덱스 기반으로 단순화
+  const deleteParticipantByIndex = (indexToDelete) => {
+    const participant = participants[indexToDelete];
+    if (!participant) return;
+    
+    const confirmMessage = `정말로 "${participant.name}"님의 기록을 삭제하시겠습니까?\n(사번: ${participant.employeeId || '-'}, 부서: ${participant.department})`;
+    
+    if (window.confirm(confirmMessage)) {
+      const newParticipants = [...participants];
+      newParticipants.splice(indexToDelete, 1);
+      setParticipants(newParticipants);
+    }
+  };
+
+  // 관리자 페이지 렌더링 함수
+  const renderAdminPage = () => {
+    // 개별 삭제 함수를 renderAdminPage 내부로 이동
+    const handleDeleteOne = (idx) => {
+      const target = participants[idx];
+      if (!target) return;
+      
+      if (window.confirm(`"${target.name}"님(${target.department})의 기록을 삭제하시겠습니까?`)) {
+        const newList = participants.filter((_, i) => i !== idx);
+        setParticipants(newList);
+      }
+    };
+    
+    const handleReset = () => {
+      // 모든 참가자 데이터를 빈 배열로 초기화
+      setParticipants([]);
+      setShowResetModal(false);
+      alert('모든 참가자 데이터가 삭제되었습니다.');
+    };
+    
+    const handleResetToSample = () => {
+      // 샘플 데이터로 초기화하는 별도 함수
+      setParticipants([
+        { name: '김창영', employeeId: '2024001', department: '기획조정실', score: 95, quizScore: 90, ideaScore: 98, completedAt: new Date(Date.now() - 1000 * 60 * 15), quizCorrectCount: 10, quizTime: 30, ideaTitle: '시민 체육시설 예약 간소화 방안', idea: '현재 체육시설 예약 시 복잡한 절차와 많은 서류 제출로 시민들이 불편을 겪고 있습니다. 온라인 원클릭 예약 시스템 도입을 통해 간단한 본인인증만으로 예약이 가능하도록 개선하고, 모바일 앱을 통한 실시간 예약 현황 확인 및 취소 기능을 제공한다면 시민 편의성이 크게 향상될 것입니다. 또한 AI 기반 추천 시스템으로 이용자 패턴을 분석하여 최적의 시설과 시간을 추천해주는 서비스도 함께 제공할 수 있습니다.' }
+      ]);
+      alert('샘플 데이터로 초기화되었습니다.');
+    };
+    
+    return (
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                👥
+                관리자 페이지
+              </h2>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowResetModal(true)}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                >
+                  모든 데이터 삭제
+                </button>
+                <button
+                  onClick={handleResetToSample}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
+                >
+                  샘플 데이터로 복원
+                </button>
+                <button
+                  onClick={() => setCurrentPage('welcome')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  경진대회로 돌아가기
+                </button>
+              </div>
+            </div>
+          
+                      <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-blue-800">총 참가자</h3>
+              <p className="text-2xl font-bold text-blue-600">{participants.length}명</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-green-800">평균 점수</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {participants.length > 0 ? Math.round(participants.reduce((sum, p) => sum + p.score, 0) / participants.length) : 0}점
+              </p>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-yellow-800">최고 점수</h3>
+              <p className="text-2xl font-bold text-yellow-600">
+                {participants.length > 0 ? Math.max(...participants.map(p => p.score)) : 0}점
+              </p>
+            </div>
+          </div>
+
+          {participants.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-300 p-3 text-left">순위</th>
+                    <th className="border border-gray-300 p-3 text-left">이름</th>
+                    <th className="border border-gray-300 p-3 text-left">사번</th>
+                    <th className="border border-gray-300 p-3 text-left">부서</th>
+                    <th className="border border-gray-300 p-3 text-left">퀴즈 점수</th>
+                    <th className="border border-gray-300 p-3 text-left">아이디어 점수</th>
+                    <th className="border border-gray-300 p-3 text-left">최종 점수</th>
+                    <th className="border border-gray-300 p-3 text-left">제출 시간</th>
+                    <th className="border border-gray-300 p-3 text-left">아이디어</th>
+                    <th className="border border-gray-300 p-3 text-center">삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participants.map((participant, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 p-3 font-semibold">{index + 1}</td>
+                      <td className="border border-gray-300 p-3">{participant.name}</td>
+                      <td className="border border-gray-300 p-3">{participant.employeeId || '-'}</td>
+                      <td className="border border-gray-300 p-3">{participant.department}</td>
+                      <td className="border border-gray-300 p-3">{participant.quizScore}</td>
+                      <td className="border border-gray-300 p-3">{participant.ideaScore}</td>
+                      <td className="border border-gray-300 p-3 font-bold text-blue-600">{participant.score}</td>
+                      <td className="border border-gray-300 p-3">
+                        {participant.completedAt.toLocaleString()}
+                      </td>
+                      <td className="border border-gray-300 p-3 max-w-xs">
+                        {participant.ideaTitle ? (
+                          <div>
+                            <div className="font-semibold text-sm text-blue-800 mb-1">
+                              {participant.ideaTitle}
+                            </div>
+                            <div className="text-xs text-gray-600 max-h-20 overflow-y-auto">
+                              {participant.idea}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">아이디어 미제출</span>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 p-3 text-center">
+                        <button
+                          onClick={() => setDeleteTarget(index)}
+                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500 text-lg">아직 참가자가 없습니다.</p>
+              <p className="text-gray-400 text-sm mt-2">새로운 참가자가 등록되면 여기에 표시됩니다.</p>
+            </div>
+          )}
+
+          {/* 아이디어 상세보기 섹션 */}
+          <div className="mt-8">
+            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              💡
+              제출된 아이디어 상세보기
+            </h3>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {participants
+                .filter(p => p.ideaTitle && p.idea)
+                .sort((a, b) => b.ideaScore - a.ideaScore)
+                .map((participant, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-800">{participant.ideaTitle}</h4>
+                        <div className="text-sm text-gray-600">
+                          {participant.name} ({participant.department}) | 
+                          AI 평가: <span className="font-semibold text-green-600">{participant.ideaScore}점</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">
+                          {participant.completedAt.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {participant.idea}
+                      </div>
+                    </div>
+                    {participant.aiEvaluation && (
+                      <div className="mt-3 bg-blue-50 p-3 rounded">
+                        <div className="text-xs text-blue-800">
+                          <strong>AI 평가:</strong> {participant.aiEvaluation.feedback}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              {participants.filter(p => p.ideaTitle && p.idea).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  아직 제출된 아이디어가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* 초기화 확인 모달 */}
+        {showResetModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">⚠️ 데이터 초기화 확인</h3>
+              <p className="text-gray-600 mb-6">
+                정말로 모든 참가자 데이터를 초기화하시겠습니까?<br/>
+                <span className="text-red-600 text-sm">이 작업은 되돌릴 수 없습니다.</span>
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700"
+                >
+                  초기화
+                </button>
+                <button
+                  onClick={() => setShowResetModal(false)}
+                  className="flex-1 bg-gray-400 text-white py-2 px-4 rounded-lg hover:bg-gray-500"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 개별 삭제 확인 모달 */}
+        {deleteTarget !== null && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">🗑️ 삭제 확인</h3>
+              <p className="text-gray-600 mb-6">
+                <strong>"{participants[deleteTarget]?.name}"</strong>님의 기록을 삭제하시겠습니까?<br/>
+                <span className="text-sm text-gray-500">
+                  사번: {participants[deleteTarget]?.employeeId || '-'}<br/>
+                  부서: {participants[deleteTarget]?.department}
+                </span>
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const newParticipants = participants.filter((_, i) => i !== deleteTarget);
+                    setParticipants(newParticipants);
+                    setDeleteTarget(null);
+                  }}
+                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700"
+                >
+                  삭제
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 bg-gray-400 text-white py-2 px-4 rounded-lg hover:bg-gray-500"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+    );
+  };
+
+  if (currentPage === 'admin') {
+    return renderAdminPage();
+  }
+
+  switch (currentPage) {
+    case 'welcome':
+      return renderWelcomePage();
+    case 'quiz':
+      return renderQuizPage();
+    case 'idea':
+      return renderIdeaPage();
+    case 'complete':
+      return renderCompletePage();
+    default:
+      return renderWelcomePage();
+  }
+};
+
+export default CreativeToppingContest;
+
+ReactDOM.render(<CreativeToppingContest />, document.getElementById('root'));
     </script>
 </body>
 </html>
